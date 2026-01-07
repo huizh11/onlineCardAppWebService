@@ -4,7 +4,7 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 const port = 3000;
 
-//database info
+// database config info
 const dbConfig = {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -13,27 +13,27 @@ const dbConfig = {
     port: process.env.DB_PORT,
     waitForConnections: true,
     connectionLimit: 100,
-    queueLimit: 0,
+    queueLimit:0,
 };
 
-//Initialize Express app
+//intialize express app
 const app = express();
-//help app to read JSON
+//helps app to read JSON
 app.use(express.json());
 
-//start the server
+// start the server
 app.listen(port, () => {
     console.log('Server running on port', port);
 });
 
-//Example Route: Get all cards
-app.get('/allcards', async (req, res) => {
+// example route: get all cards
+app.get('/allcards', async(req, res) => {
     try {
         let connection = await mysql.createConnection(dbConfig);
         const [rows] = await connection.execute('SELECT * FROM defaultdb.cards');
         res.json(rows);
     } catch (err) {
-        console.error(err);
+        console.log(err);
         res.status(500).json({message:'Server error for allcards'});
     }
-})
+});
