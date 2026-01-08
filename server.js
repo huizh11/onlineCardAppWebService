@@ -70,25 +70,26 @@ app.get('/allcharacters', async(req, res) => {
     }
 });
 
-// Example Route: Create a new card
-app.post('/addcharacters', async (req, res) => {
+// Add a new sanrio character
+    app.post('/allcharacters', async (req, res) => {
     const { character_name, character_pic } = req.body;
     try {
-        let connection = await mysql.createConnection(dbConfig);
+        const connection = await mysql.createConnection(dbConfig);
         await connection.execute(
             'INSERT INTO sanrio (character_name, character_pic) VALUES (?, ?)',
             [character_name, character_pic]
         );
         res.status(201).json({
-            message: 'Card ' + character_name + ' added successfully'
+            message: 'Character ' + character_name + ' added successfully'
         });
     } catch (err) {
         console.error(err);
         res.status(500).json({
-            message: 'Server error - could not add card ' + character_name
+            message: 'Server error - could not add character ' + character_name
         });
     }
 });
+
 
 //update
 app.put('/allcharacters/:id', async (req, res) => {
