@@ -11,8 +11,8 @@ const dbConfig = {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
+    database: process.env.DB_NAME,        // MUST be "defaultdb"
+    port: Number(process.env.DB_PORT),    // ✅ IMPORTANT FIX
     waitForConnections: true,
     connectionLimit: 100,
     queueLimit: 0,
@@ -24,7 +24,8 @@ const app = express();
 // CORS
 const allowedOrigins = [
     "http://localhost:3000",
-    // add frontend Render URL later
+    // add frontend Render URL later, e.g.
+    // "https://your-frontend.onrender.com"
 ];
 
 app.use(
@@ -58,7 +59,7 @@ app.get('/allcards', async (req, res) => {
         await connection.end();
         res.json(rows);
     } catch (err) {
-        console.error(err);
+        console.error("DB ERROR:", err); // clearer logs in Render
         res.status(500).json({ message: 'Server error for allcards' });
     }
 });
