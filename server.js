@@ -1,9 +1,10 @@
 // include the required packages
 const express = require('express');
-const mysql = require('mysql2');
-const cors = require("cors");   // ✅ ADD THIS
+const mysql = require('mysql2/promise');
+const cors = require("cors");
 require('dotenv').config();
-const port = 3000;
+
+const port = process.env.PORT || 3000;
 
 // database config info
 const dbConfig = {
@@ -20,12 +21,10 @@ const dbConfig = {
 // initialize express app
 const app = express();
 
-// ✅ ADD THIS CORS BLOCK (before routes)
+// CORS
 const allowedOrigins = [
     "http://localhost:3000",
-    // add deployed frontend later
-    // "https://your-frontend.vercel.app",
-    // "https://your-frontend.onrender.com"
+    // add frontend Render URL later
 ];
 
 app.use(
@@ -43,24 +42,28 @@ app.use(
     })
 );
 
-// helps app read JSON
+// middleware
 app.use(express.json());
 
-// start the server
-app.listen(port, () => {
-    console.log('Server running on port', port);
+// health check
+app.get('/', (req, res) => {
+    res.send('Online Card App Web Service is running');
 });
 
 // routes
 app.get('/allcards', async (req, res) => {
     try {
-        let connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute(
-            'SELECT * FROM defaultdb.cards'
-        );
+        const connection = await mysql.createConnection(dbConfig);
+        const [rows] = await connection.execute('SELECT * FROM cards');
+        await connection.end();
         res.json(rows);
     } catch (err) {
-        console.log(err);
+        console.error(err);
         res.status(500).json({ message: 'Server error for allcards' });
     }
+});
+
+// start server
+app.listen(port, () => {
+    console.log('Server running on port', port);
 });
