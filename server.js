@@ -1,6 +1,6 @@
 // include the required packages
 const express = require('express');
-const mysql = require('mysql2/promise');
+const mysql = require('mysql2/promise'); // ✅ IMPORTANT
 require('dotenv').config();
 const port = 3000;
 
@@ -11,51 +11,31 @@ const dbConfig = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: process.env.DB_PORT,
-    waitForConnections: true,
-    connectionLimit: 100,
-    queueLimit:0,
 };
 
-//intialize express app
+// initialize express app
 const app = express();
-//helps app to read JSON
 app.use(express.json());
 
-// start the server
+// allow frontend to access backend (CORS)
+const cors = require('cors');
+app.use(cors());
+
+// start server
 app.listen(port, () => {
     console.log('Server running on port', port);
 });
 
-// example route: get all cards
-app.get('/allcards', async(req, res) => {
+// API route
+app.get('/allcards', async (req, res) => {
     try {
-        let connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT * FROM defaultdb.cards');
+        const connection = await mysql.createConnection(dbConfig);
+        const [rows] = await connection.execute(
+            'SELECT * FROM cards'
+        );
         res.json(rows);
     } catch (err) {
-        console.log(err);
-        res.status(500).json({message:'Server error for allcards'});
-    }
-});
-
-// Example Route: Create a new card
-app.post('/addcard', async (req, res) => {
-    const { card_name, card_pic } = req.body;
-    try {
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute(
-            'INSERT INTO cards (card_name, card_pic) VALUES (?, ?)',
-            [card_name, card_pic]
-        );
-        res.status(201).json({
-            message: 'Card ' + card_name + ' added successfully'
-        });
-    } catch (err) {
         console.error(err);
-        res.status(500).json({
-            message: 'Server error - could not add card ' + card_name
-        });
+        res.status(500).json({ message: 'Server error for allcards' });
     }
 });
-
-
