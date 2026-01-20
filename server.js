@@ -10,7 +10,7 @@ const port = process.env.PORT || 3000;
 // Middleware
 // ===============================
 app.use(express.json());
-app.use(cors()); // ✅ ALLOW ALL ORIGINS (fixes Vercel + Render)
+app.use(cors()); // ✅ allow all origins
 
 // ===============================
 // Database config
@@ -29,6 +29,11 @@ const dbConfig = {
 // ===============================
 // Routes
 // ===============================
+
+// ✅ ROOT TEST ROUTE (THIS WAS MISSING)
+app.get("/", (req, res) => {
+    res.send("Backend is running");
+});
 
 // Get all cards
 app.get("/allcards", async (req, res) => {
