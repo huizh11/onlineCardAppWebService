@@ -24,7 +24,7 @@ app.use(express.json());
 // Secure CORS
 const allowedOrigins = [
     "http://localhost:3000",
-    "https://c219-l19-pdsjoozcr-renees-projects-73d8499a.vercel.app/cards"
+    "https://c219-l19-pdsjoozcr-renees-projects-73d8499a.vercel.app"
 ];
 
 
