@@ -6,7 +6,15 @@ require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+// ===============================
+// Middleware
+// ===============================
+app.use(express.json());
+app.use(cors()); // ✅ ALLOW ALL ORIGINS (fixes Vercel + Render)
+
+// ===============================
 // Database config
+// ===============================
 const dbConfig = {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -18,31 +26,9 @@ const dbConfig = {
     queueLimit: 0,
 };
 
-// Parse JSON
-app.use(express.json());
-
-// Secure CORS
-const allowedOrigins = [
-    "http://localhost:3000",
-    "https://c219-l19-q7ttp0vpm-renees-projects-73d8499a.vercel.app"
-];
-
-
-app.use(
-    cors({
-        origin: function (origin, callback) {
-            // allow requests with no origin (Postman/server-to-server)
-            if (!origin) return callback(null, true);
-
-            if (allowedOrigins.includes(origin)) return callback(null, true);
-
-            return callback(new Error("Not allowed by CORS"));
-        },
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: false,
-    })
-);
+// ===============================
+// Routes
+// ===============================
 
 // Get all cards
 app.get("/allcards", async (req, res) => {
@@ -55,30 +41,26 @@ app.get("/allcards", async (req, res) => {
         console.error(err);
         res.status(500).json({ message: "Server error for allcards" });
     } finally {
-        if (connection) connection.end();
+        if (connection) await connection.end();
     }
 });
 
-// Add a new card
+// Add a card
 app.post("/addcard", async (req, res) => {
     const { card_name, card_pic } = req.body;
     let connection;
 
-    // ✅ 1. Validate input
     if (!card_name || !card_pic) {
         return res.status(400).json({ message: "Missing card_name or card_pic" });
     }
 
     try {
         connection = await mysql.createConnection(dbConfig);
-
-        // ✅ 2. Insert card
         const [result] = await connection.execute(
             "INSERT INTO cards (card_name, card_pic) VALUES (?, ?)",
             [card_name, card_pic]
         );
 
-        // ✅ 3. Send back the inserted card (THIS IS THE KEY)
         res.status(201).json({
             id: result.insertId,
             card_name,
@@ -88,14 +70,13 @@ app.post("/addcard", async (req, res) => {
         console.error(err);
         res.status(500).json({ message: "Server error - could not add card" });
     } finally {
-        if (connection) connection.end();
+        if (connection) await connection.end();
     }
 });
 
-
 // Update a card
 app.put("/editcard/:id", async (req, res) => {
-    const { id } = req.params;       // ✅ use `id`, not `cardId`
+    const { id } = req.params;
     const { card_name, card_pic } = req.body;
     let connection;
 
@@ -103,39 +84,39 @@ app.put("/editcard/:id", async (req, res) => {
         connection = await mysql.createConnection(dbConfig);
         await connection.execute(
             "UPDATE cards SET card_name = ?, card_pic = ? WHERE id = ?",
-            [card_name, card_pic, id]   // ✅ match param name
+            [card_name, card_pic, id]
         );
+
         res.json({ message: "Card updated successfully" });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error - could not update card" });
     } finally {
-        if (connection) connection.end();
+        if (connection) await connection.end();
     }
 });
 
 // Delete a card
 app.delete("/deletecard/:id", async (req, res) => {
-    const { id } = req.params;       // ✅ use `id`, not `cardId`
+    const { id } = req.params;
     let connection;
 
     try {
         connection = await mysql.createConnection(dbConfig);
-        await connection.execute(
-            "DELETE FROM cards WHERE id = ?",
-            [id]
-        );
+        await connection.execute("DELETE FROM cards WHERE id = ?", [id]);
+
         res.json({ message: "Card deleted successfully" });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error - could not delete card" });
     } finally {
-        if (connection) connection.end();
+        if (connection) await connection.end();
     }
 });
 
+// ===============================
 // Start server
+// ===============================
 app.listen(port, () => {
     console.log("Server running on port", port);
 });
- 
