@@ -1,130 +1,127 @@
-// include the required packages
-const express = require('express');
-const mysql = require('mysql2/promise');
+const express = require("express");
+const mysql = require("mysql2/promise");
 const cors = require("cors");
-require('dotenv').config();
+require("dotenv").config();
 
+const app = express();
 const port = process.env.PORT || 3000;
 
-// database config info
+// Database config
 const dbConfig = {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,        // defaultdb
-    port: Number(process.env.DB_PORT),    // e.g. 17822
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
     waitForConnections: true,
-    connectionLimit: 100,
+    connectionLimit: 10,
     queueLimit: 0,
 };
 
-// initialize express app
-const app = express();
+// Parse JSON
+app.use(express.json());
 
-// CORS
+// Secure CORS
 const allowedOrigins = [
     "http://localhost:3000",
-    // add frontend Render URL later
+    // "https://YOUR-frontend.vercel.app",   // add later
+    // "https://YOUR-frontend.onrender.com"  // add later
 ];
 
 app.use(
     cors({
         origin: function (origin, callback) {
+            // allow requests with no origin (Postman/server-to-server)
             if (!origin) return callback(null, true);
-            if (allowedOrigins.includes(origin)) {
-                return callback(null, true);
-            }
+
+            if (allowedOrigins.includes(origin)) return callback(null, true);
+
             return callback(new Error("Not allowed by CORS"));
         },
-        methods: ["GET", "POST", "PUT", "DELETE"],
-        allowedHeaders: ["Content-Type"],
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: false,
     })
 );
 
-// middleware
-app.use(express.json());
-
-// health check
-app.get('/', (req, res) => {
-    res.send('Online Card App Web Service is running');
-});
-
-/* =====================
-   ROUTES
-===================== */
-
-// GET all cards
-app.get('/allcards', async (req, res) => {
+// Get all cards
+app.get("/allcards", async (req, res) => {
+    let connection;
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT * FROM cards');
-        await connection.end();
+        connection = await mysql.createConnection(dbConfig);
+        const [rows] = await connection.execute("SELECT * FROM cards");
         res.json(rows);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Failed to fetch cards' });
+        res.status(500).json({ message: "Server error for allcards" });
+    } finally {
+        if (connection) connection.end();
     }
 });
 
-// ADD card
-app.post('/addcard', async (req, res) => {
-    const { card_name, card_image } = req.body;
+// Add a new card
+app.post("/addcard", async (req, res) => {
+    const { card_name, card_pic } = req.body;
+    let connection;
 
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        const [result] = await connection.execute(
-            'INSERT INTO cards (card_name, card_image) VALUES (?, ?)',
-            [card_name, card_image]
+        connection = await mysql.createConnection(dbConfig);
+        await connection.execute(
+            "INSERT INTO cards (card_name, card_pic) VALUES (?, ?)",
+            [card_name, card_pic]
         );
-        await connection.end();
-
-        res.json({ id: result.insertId, card_name, card_image });
+        res.json({ message: "Card added successfully" });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Failed to add card' });
+        res.status(500).json({ message: "Server error - could not add card" });
+    } finally {
+        if (connection) connection.end();
     }
 });
 
-// UPDATE card
-app.put('/updatecard/:id', async (req, res) => {
-    const { id } = req.params;
-    const { card_name, card_image } = req.body;
+// Update a card
+app.put("/editcard/:id", async (req, res) => {
+    const { id } = req.params;       // ✅ use `id`, not `cardId`
+    const { card_name, card_pic } = req.body;
+    let connection;
 
     try {
-        const connection = await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig);
         await connection.execute(
-            'UPDATE cards SET card_name = ?, card_image = ? WHERE id = ?',
-            [card_name, card_image, id]
+            "UPDATE cards SET card_name = ?, card_pic = ? WHERE id = ?",
+            [card_name, card_pic, id]   // ✅ match param name
         );
-        await connection.end();
-
-        res.json({ message: 'Card updated' });
+        res.json({ message: "Card updated successfully" });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Failed to update card' });
+        res.status(500).json({ message: "Server error - could not update card" });
+    } finally {
+        if (connection) connection.end();
     }
 });
 
-// DELETE card
-app.delete('/deletecard/:id', async (req, res) => {
-    const { id } = req.params;
+// Delete a card
+app.delete("/deletecard/:id", async (req, res) => {
+    const { id } = req.params;       // ✅ use `id`, not `cardId`
+    let connection;
 
     try {
-        const connection = await mysql.createConnection(dbConfig);
+        connection = await mysql.createConnection(dbConfig);
         await connection.execute(
-            'DELETE FROM cards WHERE id = ?',
+            "DELETE FROM cards WHERE id = ?",
             [id]
         );
-        await connection.end();
-
-        res.json({ message: 'Card deleted' });
+        res.json({ message: "Card deleted successfully" });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Failed to delete card' });
+        res.status(500).json({ message: "Server error - could not delete card" });
+    } finally {
+        if (connection) connection.end();
     }
 });
 
-// start server
+// Start server
 app.listen(port, () => {
-    console.log('Server running on port', port);
+    console.log("Server running on port", port);
 });
+ 
