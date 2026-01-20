@@ -64,13 +64,26 @@ app.post("/addcard", async (req, res) => {
     const { card_name, card_pic } = req.body;
     let connection;
 
+    // ✅ 1. Validate input
+    if (!card_name || !card_pic) {
+        return res.status(400).json({ message: "Missing card_name or card_pic" });
+    }
+
     try {
         connection = await mysql.createConnection(dbConfig);
-        await connection.execute(
+
+        // ✅ 2. Insert card
+        const [result] = await connection.execute(
             "INSERT INTO cards (card_name, card_pic) VALUES (?, ?)",
             [card_name, card_pic]
         );
-        res.json({ message: "Card added successfully" });
+
+        // ✅ 3. Send back the inserted card (THIS IS THE KEY)
+        res.status(201).json({
+            id: result.insertId,
+            card_name,
+            card_pic,
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Server error - could not add card" });
@@ -78,6 +91,7 @@ app.post("/addcard", async (req, res) => {
         if (connection) connection.end();
     }
 });
+
 
 // Update a card
 app.put("/editcard/:id", async (req, res) => {
