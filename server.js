@@ -24,9 +24,9 @@ app.use(express.json());
 // Secure CORS
 const allowedOrigins = [
     "http://localhost:3000",
-    // "https://YOUR-frontend.vercel.app",   // add later
-    // "https://YOUR-frontend.onrender.com"  // add later
+    "https://c219-l19-4547pck52-renees-projects-73d8499a.vercel.app/"
 ];
+
 
 app.use(
     cors({
