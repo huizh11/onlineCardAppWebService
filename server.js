@@ -20,7 +20,7 @@ const port = process.env.PORT || 3000;
 // ===============================
 const allowedOrigins = [
     "http://localhost:3000",
-    "https://card-app-smoky.vercel.app",
+    "https://c219-l19.vercel.app/",
 ];
 
 app.use(
