@@ -1,148 +1,204 @@
+// ===============================
+// Required modules
+// ===============================
 const express = require("express");
 const mysql = require("mysql2/promise");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
+// ===============================
+// App setup
+// ===============================
 const app = express();
+app.use(express.json());
+
 const port = process.env.PORT || 3000;
 
 // ===============================
-// Middleware
+// CORS configuration
 // ===============================
-app.use(express.json());
-app.use(cors()); // ✅ allow all origins
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://card-app-smoky.vercel.app",
+];
+
+app.use(
+    cors({
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true);
+            if (allowedOrigins.includes(origin)) return callback(null, true);
+            return callback(new Error("Not allowed by CORS"));
+        },
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: false,
+    })
+);
 
 // ===============================
-// Database config
+// Database pool (ONE instance)
 // ===============================
 const dbConfig = {
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
+    host: (process.env.DB_HOST || "").trim(),
+    user: (process.env.DB_USER || "").trim(),
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
+    database: (process.env.DB_NAME || "").trim(),
+    port: Number(process.env.DB_PORT) || 3306,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 100,
     queueLimit: 0,
 };
+
+const pool = mysql.createPool(dbConfig);
+
+// ===============================
+// Demo auth setup
+// ===============================
+const DEMO_USER = {
+    id: 1,
+    username: "admin",
+    password: "admin123",
+};
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// ===============================
+// Auth routes
+// ===============================
+app.post("/login", (req, res) => {
+    const { username, password } = req.body;
+
+    if (
+        username !== DEMO_USER.username ||
+        password !== DEMO_USER.password
+    ) {
+        return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+        { userId: DEMO_USER.id, username: DEMO_USER.username },
+        JWT_SECRET,
+        { expiresIn: "1h" }
+    );
+
+    res.json({ token });
+});
+
+// ===============================
+// JWT middleware
+// ===============================
+function requireAuth(req, res, next) {
+    const header = req.headers.authorization;
+
+    if (!header) {
+        return res.status(401).json({ error: "Authorization header missing" });
+    }
+
+    const [type, token] = header.split(" ");
+
+    if (type !== "Bearer" || !token) {
+        return res.status(401).json({ error: "Invalid authorization header" });
+    }
+
+    try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        req.user = payload;
+        next();
+    } catch {
+        return res.status(401).json({ error: "Invalid or expired token" });
+    }
+}
 
 // ===============================
 // Routes
 // ===============================
 
-// ✅ ROOT TEST ROUTE (THIS WAS MISSING)
+// Root test
 app.get("/", (req, res) => {
     res.send("Backend is running");
 });
 
 // Get all cards
 app.get("/allcards", async (req, res) => {
-    let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute("SELECT * FROM cards");
+        const [rows] = await pool.query("SELECT * FROM cards");
         res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Server error for allcards" });
-    } finally {
-        if (connection) await connection.end();
+    } catch (error) {
+        console.error("Error fetching cards:", error);
+        res.status(500).json({ error: "Internal Server Error for allcards" });
     }
 });
 
-// Add a card
-app.post("/addcard", async (req, res) => {
+// Add card (protected)
+app.post("/addcard", requireAuth, async (req, res) => {
     const { card_name, card_pic } = req.body;
-    let connection;
 
     if (!card_name || !card_pic) {
-        return res.status(400).json({ message: "Missing card_name or card_pic" });
+        return res
+            .status(400)
+            .json({ error: "card_name and card_pic are required" });
     }
 
     try {
-        connection = await mysql.createConnection(dbConfig);
-        const [result] = await connection.execute(
+        const [result] = await pool.query(
             "INSERT INTO cards (card_name, card_pic) VALUES (?, ?)",
             [card_name, card_pic]
         );
 
-        res.status(201).json({
-            id: result.insertId,
-            card_name,
-            card_pic,
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Server error - could not add card" });
-    } finally {
-        if (connection) await connection.end();
+        res.status(201).json(result);
+    } catch (error) {
+        console.error("Error adding card:", error);
+        res.status(500).json({ error: "Internal Server Error for addcard" });
     }
 });
 
-// // Update a card
-// app.put("/editcard/:id", async (req, res) => {
-//     const { id } = req.params;
-//     const { card_name, card_pic } = req.body;
-//     let connection;
-//
-//     try {
-//         connection = await mysql.createConnection(dbConfig);
-//         await connection.execute(
-//             "UPDATE cards SET card_name = ?, card_pic = ? WHERE id = ?",
-//             [card_name, card_pic, id]
-//         );
-//
-//         res.json({ message: "Card updated successfully" });
-//     } catch (err) {
-//         console.error(err);
-//         res.status(500).json({ message: "Server error - could not update card" });
-//     } finally {
-//         if (connection) await connection.end();
-//     }
-// });
-//
-// // Delete a card
-// app.delete("/deletecard/:id", async (req, res) => {
-//     const { id } = req.params;
-//     let connection;
-//
-//     try {
-//         connection = await mysql.createConnection(dbConfig);
-//         await connection.execute("DELETE FROM cards WHERE id = ?", [id]);
-//
-//         res.json({ message: "Card deleted successfully" });
-//     } catch (err) {
-//         console.error(err);
-//         res.status(500).json({ message: "Server error - could not delete card" });
-//     } finally {
-//         if (connection) await connection.end();
-//     }
-// });
-
-// Example Route: Update a card
-app.put('/updatecard/:id', async (req, res) => {
+// Update card
+app.put("/updatecard/:id", async (req, res) => {
     const { id } = req.params;
     const { card_name, card_pic } = req.body;
-    try{
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('UPDATE cards SET card_name=?, card_pic=? WHERE id=?', [card_name, card_pic, id]);
-        res.status(201).json({ message: 'Card ' + id + ' updated successfully!' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not update card ' + id });
+
+    if (!card_name || !card_pic) {
+        return res
+            .status(400)
+            .json({ error: "card_name and card_pic are required" });
+    }
+
+    try {
+        const [result] = await pool.query(
+            "UPDATE cards SET card_name = ?, card_pic = ? WHERE id = ?",
+            [card_name, card_pic, id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Card not found" });
+        }
+
+        res.json({ message: "Card updated", affectedRows: result.affectedRows });
+    } catch (error) {
+        console.error("Error updating card:", error);
+        res.status(500).json({ error: "Internal Server Error for updatecard" });
     }
 });
 
-// Example Route: Delete a card
-app.delete('/deletecard/:id', async (req, res) => {
+// Delete card
+app.delete("/deletecard/:id", async (req, res) => {
     const { id } = req.params;
-    try{
-        let connection = await mysql.createConnection(dbConfig);
-        await connection.execute('DELETE FROM cards WHERE id=?', [id]);
-        res.status(201).json({ message: 'Card ' + id + ' deleted successfully!' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error - could not delete card ' + id });
+
+    try {
+        const [result] = await pool.query(
+            "DELETE FROM cards WHERE id = ?",
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Card not found" });
+        }
+
+        res.json({ message: "Card deleted", affectedRows: result.affectedRows });
+    } catch (error) {
+        console.error("Error deleting card:", error);
+        res.status(500).json({ error: "Internal Server Error for deletecard" });
     }
 });
 
@@ -150,5 +206,5 @@ app.delete('/deletecard/:id', async (req, res) => {
 // Start server
 // ===============================
 app.listen(port, () => {
-    console.log("Server running on port", port);
+    console.log(`Server running on port ${port}`);
 });
